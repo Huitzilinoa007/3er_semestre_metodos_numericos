@@ -1,0 +1,156 @@
+/* ====================================================================================
+   Tema oscuro "laboratorio nocturno".
+   Aquí se usan variables CSS (--nombre) para que cada color se defina UNA sola vez y
+   cambiar la paleta sea tocar solo este bloque.
+   ==================================================================================== */
+/* Aquí se cargan las tipografías de Google Fonts: Sora para títulos, DM Sans para texto y JetBrains Mono para la tabla. */
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  --fondo: #0B0F14;       /* Fondo de la página. */
+  --superficie: #131A23;  /* Tarjetas. */
+  --elevada: #1A2330;     /* Encabezados de tabla y elementos que "flotan". */
+  --hoja: #0F1620;        /* Fondo de la hoja de desarrollo. */
+  --borde: #2A3647;
+  --texto: #E8EDF4;
+  --gris: #93A1B5;        /* Texto secundario. */
+  --cian: #38BDF8;        /* Acento principal. */
+  --menta: #34D399;       /* Todo bien (convergió, intervalo válido). */
+  --violeta: #A78BFA;     /* Sección de procedimiento. */
+  --ambar: #FBBF24;       /* Lo importante: raíz, celda que se calcula, iteración final. */
+  --coral: #FB7185;       /* Errores. */
+}
+
+/* ---- Limpieza de lo nativo de Streamlit ----
+   Se oculta el menú, el footer y los botones de deploy porque en una herramienta propia distraen.
+   El header NO se oculta: ahí vive el menú de navegación superior. */
+#MainMenu, footer, [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+[data-testid="stAppDeployButton"], [data-testid="stMainMenu"], .stDeployButton { display: none !important; }
+header[data-testid="stHeader"] { background: transparent; }
+
+/* Ancho máximo del contenido: más ancho que el predeterminado para que quepan tabla y gráficas. */
+.block-container { max-width: 1240px; padding-top: 2.2rem; padding-bottom: 5rem; }
+
+/* ---- Tipografías (respaldo del config.toml: sin internet se usan las del sistema) ---- */
+.stApp { font-family: "DM Sans", system-ui, sans-serif; }
+h1, h2, h3, h4, h5 { font-family: "Sora", "DM Sans", sans-serif !important; letter-spacing: -0.01em; }
+code, pre { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+/* ---- Marca (arriba de todo) ---- */
+.marca { font-family: "Sora", sans-serif; font-weight: 600; font-size: 1rem; color: var(--cian); margin: 0 0 .6rem; }
+/* El cuadrito ámbar antes del nombre funciona como un pequeño logotipo sin necesidad de imagen. */
+.marca::before { content: ""; display: inline-block; width: 10px; height: 10px; background: var(--ambar);
+                 border-radius: 2px; margin-right: .55rem; }
+
+/* ---- Encabezado de cada página: ruta pequeña, título grande y resumen ---- */
+.encabezado { margin: .2rem 0 1.6rem; }
+.encabezado .ruta { color: var(--gris); font-size: .85rem; }
+.encabezado h1 { font-size: 2.6rem; font-weight: 700; line-height: 1.1; margin: .3rem 0 .5rem; color: var(--texto); padding: 0; }
+/* Esta barrita bajo el título marca la jerarquía: el título de página es lo más grande y lo único con subrayado. */
+.encabezado h1::after { content: ""; display: block; width: 56px; height: 4px; background: var(--cian);
+                        border-radius: 2px; margin-top: .7rem; }
+.encabezado p { color: var(--gris); font-size: 1.05rem; max-width: 72ch; margin: 0; }
+
+/* ---- Títulos de sección: barra de color a la izquierda + título + descripción ---- */
+.seccion { margin: 2.8rem 0 1rem; padding-left: .95rem; border-left: 4px solid var(--cian); }
+.seccion h2 { font-size: 1.55rem; font-weight: 600; margin: 0; padding: 0; color: var(--texto); }
+.seccion p { margin: .25rem 0 0; color: var(--gris); font-size: .95rem; max-width: 78ch; }
+/* Cada sección tiene su color para distinguirla de un vistazo al hacer scroll. */
+.seccion.a-violeta { border-left-color: var(--violeta); }
+.seccion.a-cian { border-left-color: var(--cian); }
+.seccion.a-menta { border-left-color: var(--menta); }
+.seccion.a-ambar { border-left-color: var(--ambar); }
+
+/* ---- Tarjetas ---- */
+[class*="st-key-datos"], [class*="st-key-paso"] {
+  background-color: var(--superficie); border: 1px solid var(--borde); border-radius: 14px; box-shadow: none; }
+
+/* ---- Botones ---- */
+.stButton > button, .stDownloadButton > button {
+  font-weight: 600; box-shadow: none;
+  transition: transform .08s ease, background-color .15s ease, border-color .15s ease; }
+/* Al presionar el botón baja 1 px: da sensación de que "se aprieta". */
+.stButton > button:active, .stDownloadButton > button:active { transform: translateY(1px); }
+
+/* ---- Campos ---- */
+[data-baseweb="input"] input::placeholder, [data-baseweb="textarea"] textarea::placeholder {
+  color: var(--gris); font-style: italic; opacity: .8; }
+/* Aro visible al navegar con teclado (accesibilidad). */
+:focus-visible { outline: 2px solid var(--cian); outline-offset: 2px; }
+.msg { font-size: .85rem; margin: -.35rem 0 .7rem; }
+.msg-error { color: var(--coral); }
+.msg-ok { color: var(--menta); }
+
+/* ---- Tarjetas KPI: barra de color según lo que significan ---- */
+[class*="st-key-kpi_"] { background: var(--superficie); border: 1px solid var(--borde) !important;
+                         border-left: 4px solid var(--cian) !important; border-radius: 14px; box-shadow: none; }
+.st-key-kpi_raiz { border-left-color: var(--ambar) !important; }
+.st-key-kpi_estado_ok { border-left-color: var(--menta) !important; }
+.st-key-kpi_estado_mal { border-left-color: var(--coral) !important; }
+[data-testid="stMetricValue"] { font-family: "Sora", sans-serif; font-weight: 700; font-size: 1.6rem; }
+[data-testid="stMetricLabel"] p { color: var(--gris); font-size: .88rem; }
+.st-key-kpi_raiz [data-testid="stMetricValue"] { color: var(--ambar); }
+.st-key-kpi_estado_ok [data-testid="stMetricValue"] { color: var(--menta); }
+.st-key-kpi_estado_mal [data-testid="stMetricValue"] { color: var(--coral); }
+
+/* ---- Hoja de desarrollo: renglones tenues y margen ámbar, como un cuaderno nocturno ---- */
+.st-key-hoja, .st-key-vacio {
+  background-color: var(--hoja);
+  background-image:
+    linear-gradient(to right, transparent 10px, rgba(251,191,36,.45) 10px, rgba(251,191,36,.45) 11px, transparent 11px),
+    repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(147,161,181,.07) 31px, rgba(147,161,181,.07) 32px);
+  border: 1px solid var(--borde); border-radius: 14px; box-shadow: none; padding-left: .6rem; }
+/* Títulos (####) y subtítulos (#####) de la hoja con jerarquía clara: título cian con línea, subtítulo ámbar con cuadrito. */
+.st-key-hoja h4 { font-size: 1.2rem; color: var(--cian) !important; border-bottom: 1px solid var(--borde);
+                  padding: 0 0 .4rem; margin: 1.8rem 0 .9rem; }
+.st-key-hoja h4:first-child, .st-key-hoja > div > div:first-child h4 { margin-top: .4rem; }
+.st-key-hoja h5 { font-size: 1rem; color: var(--ambar) !important; margin: 1.3rem 0 .4rem; padding: 0; }
+.st-key-hoja h5::before { content: ""; display: inline-block; width: 9px; height: 9px; background: var(--ambar);
+                          border-radius: 2px; margin-right: .55rem; }
+/* Las ecuaciones largas se pueden desplazar a los lados en lugar de cortarse. */
+.st-key-hoja .katex-display, .st-key-paso .katex-display { overflow-x: auto; overflow-y: hidden; padding: .25rem 0; margin: .5rem 0; }
+
+/* ---- Tabla de iteraciones (HTML propio) ---- */
+.tabla-wrap { overflow: auto; max-height: 500px; border: 1px solid var(--borde); border-radius: 14px; background: var(--superficie); }
+table.tabla { border-collapse: separate; border-spacing: 0; width: 100%;
+              font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .85rem;
+              font-variant-numeric: tabular-nums; }
+/* El encabezado se queda fijo (sticky) arriba aunque la tabla se desplace. */
+table.tabla th { position: sticky; top: 0; z-index: 1; background: var(--elevada); color: var(--gris);
+                 font-family: "DM Sans", sans-serif; font-weight: 600; text-align: right;
+                 padding: .65rem .95rem; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+table.tabla td { text-align: right; padding: .5rem .95rem; border-bottom: 1px solid rgba(42,54,71,.55);
+                 white-space: nowrap; color: var(--texto); transition: background-color .25s ease; }
+table.tabla td:first-child { color: var(--gris); }
+/* Celda todavía sin llenar: solo un puntito tenue, para ver que "falta" sin estorbar. */
+table.tabla td.vacia::after { content: "·"; color: #3A485C; }
+/* Celdas que se USAN para calcular la nueva: azul. */
+table.tabla td.fuente { background: rgba(56,189,248,.18); box-shadow: inset 0 0 0 1px rgba(56,189,248,.7); color: #BEE9FD; }
+/* Celda que se CALCULA ahora: ámbar con un pequeño "latido". */
+table.tabla td.activa { background: rgba(251,191,36,.26); box-shadow: inset 0 0 0 1.5px var(--ambar);
+                        color: var(--ambar); font-weight: 600; animation: latido .45s ease-out; }
+/* Fila que acaba de aparecer completa (animación rápida) y fila donde se alcanza la tolerancia. */
+table.tabla tr.fila-nueva td.lleno { background: rgba(167,139,250,.14); }
+table.tabla tr.fila-final td { background: rgba(251,191,36,.10); font-weight: 600; }
+table.tabla tr.fila-final td:first-child { box-shadow: inset 4px 0 0 var(--ambar); color: var(--ambar); }
+.tabla-nota { color: var(--gris); font-size: .8rem; margin: .45rem .2rem 0; }
+.paso-texto { margin: .1rem 0 .7rem; color: var(--ambar); font-size: .95rem; min-height: 1.5rem; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 1.3rem; margin: 0 0 .7rem; color: var(--gris); font-size: .85rem; }
+.chip { display: inline-block; width: 13px; height: 13px; border-radius: 3px; margin-right: .5rem; vertical-align: -2px; }
+.chip-activa { background: rgba(251,191,36,.45); box-shadow: inset 0 0 0 1px var(--ambar); }
+.chip-fuente { background: rgba(56,189,248,.3); box-shadow: inset 0 0 0 1px var(--cian); }
+.chip-final { background: rgba(251,191,36,.18); box-shadow: inset 4px 0 0 var(--ambar); }
+@keyframes latido { 0% { transform: scale(1.06); } 100% { transform: none; } }
+
+/* ---- Pestañas ---- */
+button[data-baseweb="tab"] { font-family: "Sora", sans-serif; font-weight: 600; }
+
+/* ---- Aparición suave de los resultados (una sola vez, cuando se montan) ---- */
+@keyframes aparecer { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.st-key-resultados { animation: aparecer .35s ease-out both; }
+[data-baseweb="tab-panel"] { animation: aparecer .15s ease-out both; }
+
+/* ---- Accesibilidad: si el sistema pide menos movimiento, se apagan las animaciones CSS ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

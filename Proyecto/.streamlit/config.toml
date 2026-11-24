@@ -1,0 +1,17 @@
+[theme]
+base = "dark"
+primaryColor = "#FF4B4B"                   # Lápiz rojo para acentos/botones
+backgroundColor = "#141D1A"                # Fondo pizarra verde oscuro
+secondaryBackgroundColor = "#1E2B26"       # Barra lateral y tarjetas en verde oscuro
+textColor = "#E8EDE4"                      # Texto en tono papel verde pálido
+linkColor = "#6B8AFF"                      # Azul claro legible sobre oscuro
+borderColor = "#32443D"
+showWidgetBorder = true
+baseRadius = "6px"
+buttonRadius = "3px"
+codeBackgroundColor = "#1A2521"
+dataframeBorderColor = "#32443D"
+dataframeHeaderBackgroundColor = "#25352F"
+font = "Public Sans:https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&display=swap"
+headingFont = "Literata:https://fonts.googleapis.com/css2?family=Literata:wght@500;600&display=swap"
+codeFont = "'IBM Plex Mono':https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"

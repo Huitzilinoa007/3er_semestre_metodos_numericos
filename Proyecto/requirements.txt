@@ -1,0 +1,6 @@
+# Librerías que necesita la app (se instalan con: pip install -r requirements.txt)
+streamlit>=1.50   # Dibuja la página web; se pide una versión reciente porque usa menú superior, st.html y tema avanzado.
+numpy>=1.26       # Cálculo con arreglos de números (evaluar f en muchos puntos de golpe, para las gráficas).
+pandas>=2.1       # Tablas de iteraciones (DataFrame): el formato en que cada método devuelve su historial.
+sympy>=1.12       # Álgebra simbólica: lee la función escrita, calcula derivadas y genera el LaTeX.
+plotly>=5.20      # Gráficas interactivas (zoom, animación Play/Pausa).
