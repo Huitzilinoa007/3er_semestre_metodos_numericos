@@ -24,8 +24,8 @@ def _reanimar(clave_anim: str) -> None:
 def _calcular(spec: MetodoSpec, datos: dict) -> None:
     s = st.session_state
     # Primero se revisa que no falte ningún dato, para avisar con claridad en lugar de fallar adentro del método.
-    faltan = [c.label for c in spec.campos_texto if not datos["textos"][c.key].strip()]
-    faltan += [c.label for c in spec.campos_num if datos["numeros"][c.key] is None]
+    faltan = [c.label for c in spec.campos_texto if not c.opcional and not datos["textos"][c.key].strip()]
+    faltan += [c.label for c in spec.campos_num if not c.opcional and datos["numeros"][c.key] is None]
     if faltan:
         st.warning("Completa los campos: " + ", ".join(faltan) + ".")
         return
@@ -42,7 +42,8 @@ def _calcular(spec: MetodoSpec, datos: dict) -> None:
         st.warning(str(exc))
     except (ZeroDivisionError, OverflowError, FloatingPointError) as exc:
         s.pop(clave(spec, "res"), None)
-        st.error(f"Operación inválida durante el cálculo: {exc}")
+        st.error("Operación inválida durante el cálculo: algún valor se volvió demasiado grande o se dividió entre "
+                 f"cero ({type(exc).__name__}). Prueba con otros datos iniciales.")
     except Exception as exc:  # noqa: BLE001 - aquí se atrapa todo porque la app nunca debe caerse por un caso raro.
         s.pop(clave(spec, "res"), None)
         st.error(f"Ocurrió un error inesperado: {exc}")
@@ -82,18 +83,21 @@ def renderizar_metodo(spec: MetodoSpec) -> None:
     velocidad = datos["velocidad"] if animar else "Sin animación"
 
     # ---- 1) Procedimiento
-    seccion("Procedimiento", "El desarrollo paso a paso con tus datos: se muestran las iteraciones que elegiste "
-                             "y, al final, la última, que lleva al resultado.", "violeta")
+    palabra = "iteraciones" if "Iteraciones" in spec.etiqueta_pasos else "pasos"
+    seccion("Procedimiento", f"El desarrollo paso a paso con tus datos: se muestran los {palabra} que elegiste "
+                             "y, al final, el último, que lleva al resultado.", "violeta")
     boton = st.empty()   # Un solo lugar para el botón: primero "Saltar", y al terminar todo, "Repetir".
     if animar:
         boton.button("Saltar animación", key=clave(spec, "saltar"))
     escribir_hoja(bloques(res, d, datos["iteraciones"]), velocidad)
 
     # ---- 2) Tabla que se va llenando
-    seccion("Tabla de iteraciones", "Así se va llenando: cada celda nueva se calcula con las celdas resaltadas en azul.", "cian")
+    seccion(spec.titulo_tabla, spec.desc_tabla, "cian")
     tabla_iteraciones(res, d, velocidad)
     boton.button("Repetir animación", key=clave(spec, "repetir"), on_click=_reanimar, args=(k_anim,))
 
     # ---- 3) Resultados y gráfica (ya abajo, cuando termina lo anterior)
-    seccion("Resultados", "Solución, estado de convergencia y gráfica interactiva para recorrer cada iteración.", "menta")
+    seccion("Resultados", spec.desc_resultados, "menta")
+    if res.ctx.get("aviso"):
+        st.warning(res.ctx["aviso"])
     mostrar_resultados(spec, res, d, datos["rango"], datos["iteraciones"])

@@ -6,11 +6,13 @@
 import pandas as pd
 
 
-def punto_fijo_validado(x0, g, g_prime, tol, max_iter=1000):
-    # Aquí se valida |g'(x0)| < 1 porque es la condición que asegura que la iteración se va acercando a la solución.
+def punto_fijo_validado(x0, g, g_prime, tol, max_iter=1000, estricto=True):
+    # |g'(x)| < 1 CERCA DEL PUNTO FIJO es lo que garantiza convergencia. Revisarlo solo en x0 es una prueba rápida
+    # pero puede rechazar casos que sí convergen (ej. g = e^(-x) con x0 = -0.5). Con estricto=False (lo que usa la app)
+    # no se bloquea: se itera, se avisa y, si no converge, se devuelve la tabla para que se vea qué pasó.
     derivada_inicial = abs(g_prime(x0))
 
-    if derivada_inicial >= 1:
+    if derivada_inicial >= 1 and estricto:
         raise ValueError("La derivada en el punto inicial es mayor o igual a 1. El método va a divergir.")
 
     x_prev = x0
@@ -22,14 +24,14 @@ def punto_fijo_validado(x0, g, g_prime, tol, max_iter=1000):
     df.loc[len(df)] = [x_prev, x_curr, abs(x_curr - x_prev)]
 
     # Ya con el primer valor, se va iterando poco a poquito hasta que dos valores seguidos casi no cambien.
-    while abs(x_curr - x_prev) > tol and iter_count < max_iter:
+    while abs(x_curr - x_prev) > tol and iter_count < max_iter and abs(x_curr) < 1e150:
         x_prev = x_curr
         x_curr = g(x_prev)
         iter_count += 1
         df.loc[len(df)] = [x_prev, x_curr, abs(x_curr - x_prev)]
 
     # Solo se avisa "no convergió" si al terminar el error sigue siendo mayor que la tolerancia.
-    if abs(x_curr - x_prev) > tol:
+    if abs(x_curr - x_prev) > tol and estricto:
         raise RuntimeError(f"Se alcanzó el límite de {max_iter} iteraciones sin converger.")
 
     return x_curr, df

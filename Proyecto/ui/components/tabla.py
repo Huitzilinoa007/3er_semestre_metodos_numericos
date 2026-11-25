@@ -21,7 +21,7 @@ from ui.compat import pintar_html
 VENTANA = 12
 # (pausa por celda, pausa por fila rápida) en segundos, según la velocidad elegida.
 RETARDOS = {"Lenta": (0.35, 0.15), "Normal": (0.18, 0.08), "Rápida": (0.08, 0.03)}
-ENTEROS = ("iter", "grado", "iteraciones")
+ENTEROS = ("iter", "grado", "iteraciones", "i", "k", "paso", "nivel", "peso", "bit")
 # Tabla de traducción para escribir subíndices bonitos: x_0 -> x₀, x_n+1 -> xₙ₊₁.
 _SUBINDICES = str.maketrans("0123456789n+-", "₀₁₂₃₄₅₆₇₈₉ₙ₊₋")
 
@@ -44,13 +44,20 @@ def celda_texto(valor, col: str, d: int) -> str:
     if isinstance(valor, (list, tuple)):
         return ", ".join(f"{v:g}" for v in valor)   # Coeficientes de polinomios (deflación).
     if col in ENTEROS:
-        return str(int(valor))
+        return "—" if pd.isna(valor) else str(int(valor))
     if str(col).startswith("error"):
         return "—" if pd.isna(valor) else f"{valor:.3e}"
+    if col == "razón":
+        return "—" if pd.isna(valor) else f"{valor:.3f}"
     if isinstance(valor, (complex, np.complexfloating)):
         return txt_num(valor, d)
     if isinstance(valor, (float, np.floating)):
-        return "—" if pd.isna(valor) else f"{valor:.{d}f}"
+        if pd.isna(valor):
+            return ""   # Celdas que no existen (por ejemplo, arriba de la diagonal en Neville) se dejan vacías.
+        if valor != 0 and (abs(valor) < 10 ** (-d) or abs(valor) >= 1e9):
+            return f"{valor:.{max(d - 2, 2)}e}"   # Muy chico o muy grande: en notación científica para no ver 0.000000.
+        texto = f"{valor:.{d}f}"
+        return texto[1:] if texto.startswith("-") and set(texto[1:]) <= set("0.") else texto
     return str(valor)
 
 
@@ -93,7 +100,8 @@ def tabla_iteraciones(res: Resultado, d: int, velocidad: str) -> None:
     fila_final = indice_convergencia(res)
     completas = np.ones((n, len(columnas)), dtype=bool)
 
-    pintar_html(st, LEYENDA)
+    # La tercera muestra de color (iteración de convergencia) solo tiene sentido en los métodos iterativos.
+    pintar_html(st, LEYENDA if fila_final is not None else re.sub(r'<span><i class="chip chip-final">.*?</span>', "", LEYENDA))
     lugar_paso = st.empty()    # Aquí se escribe qué celda se está calculando.
     lugar_tabla = st.empty()   # Un solo lugar que se redibuja en cada cuadro (así la tabla "se anima" en su sitio).
 

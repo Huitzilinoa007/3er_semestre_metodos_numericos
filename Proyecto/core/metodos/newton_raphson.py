@@ -3,7 +3,7 @@
 import pandas as pd  # pandas arma la tabla de iteraciones.
 
 
-def raiz_newton(f, f_prima_x, x, error, max_iter=1000):
+def raiz_newton(f, f_prima_x, x, error, max_iter=1000, lanzar=True):
     """
     Método de Newton-Raphson puro.
     No realiza ningún print interno; devuelve la raíz encontrada y el DataFrame con el historial.
@@ -51,4 +51,7 @@ def raiz_newton(f, f_prima_x, x, error, max_iter=1000):
         x = x1
         i += 1
 
+    # lanzar=False lo usa la app: así se puede mostrar la tabla de lo que sí se hizo y marcar "No convergió".
+    if not lanzar:
+        return x, df
     raise RuntimeError(f"Se alcanzó el límite máximo de {max_iter} iteraciones sin converger.")

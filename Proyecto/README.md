@@ -10,14 +10,47 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Pruebas de la lógica (no necesitan Streamlit): `python -m unittest discover -s tests -v`
+Pruebas de la lógica (no necesitan Streamlit): `python -m unittest discover -s tests -v` (37 pruebas)
 
 ## Qué hay hoy
 
-- **Raíces de Ecuaciones (listos):** Bisección, Regla Falsa, Newton-Raphson, Secante, Punto Fijo, Aitken, Deflación y Müller.
-- **En desarrollo (solo aparecen en el menú):** Lagrange, **Neville**, Diferencias Divididas de Newton, Splines Cúbicos,
-  Diferencias Finitas, Regla del Trapecio, Simpson 1/3 y Simpson 3/8.
-- Los campos de función empiezan **vacíos**; al abrir no se calcula nada ni aparece ningún error.
+- **Errores y Punto Flotante:** Punto flotante IEEE 754 (simple y doble).
+- **Raíces de Ecuaciones:** Bisección, Regla Falsa, Newton-Raphson, Secante, Punto Fijo, Aitken, Deflación y Müller.
+- **Interpolación:** Neville y Hermite.
+- **Derivadas Numéricas:** Derivación por 2 puntos y por 5 puntos (centrada y de extremo).
+- **Integración Numérica:** Trapecio, Simpson 3/8, Cuadratura adaptativa, Integración doble por trapecio y por Simpson 3/8.
+- **En desarrollo (Persona B, solo aparecen en el menú):** Lagrange, Diferencias divididas, Splines cúbicos,
+  Derivación por 3 puntos, Extrapolación de Richardson, Simpson 1/3, Romberg, Cuadratura gaussiana e
+  Integración doble por Simpson 1/3.
+- Los campos empiezan **vacíos**; al abrir no se calcula nada ni aparece ningún error.
+
+### Métodos "directos" (Persona A)
+
+Los métodos que no son de raíces no iteran hasta una tolerancia: su tabla tiene **una fila por paso del cálculo**
+(un nodo, un valor de h, un subintervalo, un bit…). Viven aparte para no mezclarse con los de raíces:
+
+| Pieza | Archivo |
+|---|---|
+| Lógica | `core/metodos/punto_flotante.py`, `neville.py`, `hermite.py`, `derivacion.py`, `integracion.py`, `integracion_multiple.py` |
+| Ejecutores (texto → Resultado, con sus tarjetas en `ctx["kpis"]`) | `core/ejecutores_directos.py` |
+| Procedimiento paso a paso | `core/procedimiento_directos.py` |
+| Plan de la tabla animada | final de `core/tabla_pasos.py` (las reglas reciben `(i, res)`) |
+| Gráficas | `ui/plots/directos.py` |
+| Campos y textos | `METODOS_PERSONA_A` en `registry.py` |
+
+`registry.py` ahora admite campos de tipo `lista` (nodos separados por comas), `lista_o_funcion` (valores o una
+función de x), `funcion_xy` (f(x, y)), `numero` y `entero`, campos `opcional`, selectores (`Opcion`) y qué controles
+comunes mostrar (`controles=("tol", "nmax")` o ninguno). Para los métodos de la Persona B conviene copiar el
+`MetodoSpec` del método más parecido (por ejemplo Simpson 3/8 para Simpson 1/3, o Neville para Lagrange).
+
+### Correcciones de la revisión del 24/11/2026
+
+- Bisección y Regla Falsa ya no dicen "Convergió" en un polo (1/x, tan x): marcan "No convergió" y explican la asíntota.
+- Punto Fijo ya no bloquea cuando |g'(x₀)| ≥ 1 (ej. g = e^(−x), x₀ = −0.5 sí converge): avisa y calcula.
+- Newton, Punto Fijo y Müller, cuando no convergen, muestran la tabla de lo que hicieron con "No convergió".
+- Müller ya no falla con "puntos colineales" cuando un punto inicial es raíz exacta (x³ − 1 con 0, 1, 2).
+- Aitken explica en español cuando la sucesión diverge (antes salía "Numerical result out of range").
+- Deflación sugiere Müller cuando quedan raíces complejas; ya no aparece "−0.000000".
 
 ## Cómo se comporta cada método
 

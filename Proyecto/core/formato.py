@@ -23,7 +23,12 @@ def _real_tex(x: float, d: int) -> str:
     if abs(x) < 10 ** (-d) or abs(x) >= 1e7:
         mantisa, exp = f"{x:.{max(min(d, 6) - 2, 2)}e}".split("e")
         return rf"{mantisa}\times10^{{{int(exp)}}}"
-    return f"{x:.{d}f}"
+    return _sin_menos_cero(f"{x:.{d}f}")
+
+
+def _sin_menos_cero(texto: str) -> str:
+    # Un número como -2.4e-7 redondeado a 6 decimales sale "-0.000000"; ese signo confunde, así que se quita.
+    return texto[1:] if texto.startswith("-") and set(texto[1:]) <= set("0.") else texto
 
 
 def tex_num(x, d: int = 6) -> str:
@@ -58,7 +63,7 @@ def txt_num(x, d: int = 6) -> str:
     x = float(x)
     if x != x:
         return "—"
-    return f"{x:.{d}f}"
+    return _sin_menos_cero(f"{x:.{d}f}")
 
 
 def txt_sci(x, d: int = 3) -> str:

@@ -11,6 +11,8 @@ from .formato import tex_num as N   # N = número en LaTeX (se abrevia porque se
 from .formato import tex_sub as S   # S = número listo para sustituir (entre paréntesis si es negativo).
 from .formato import tex_tol, txt_num, txt_sci
 from .parser import X, latex_de
+from .procedimiento_directos import METODOS as _DIRECTOS
+from .procedimiento_directos import bloques_directo, detalle_directo, etiqueta_paso_directo
 
 CERRADOS = ("biseccion", "falsa_posicion")
 
@@ -97,7 +99,8 @@ def _verif_cerrados(res, d):
     prod = fa * fb
     if prod < 0:
         B += [("latex", rf"f(a)\,f(b) = {S(fa, d)}\cdot{S(fb, d)} = {N(prod, d)} < 0"),
-              ("texto", "Como f(a)·f(b) < 0 y f es continua, hay al menos una raíz en [a, b] (teorema de Bolzano).")]
+              ("texto", "Como f(a)·f(b) < 0, si f es continua en [a, b] hay al menos una raíz ahí (teorema de Bolzano). "
+                       "Ojo: si f tiene una asíntota en el intervalo, el signo también cambia pero no hay raíz.")]
     else:
         B.append(("texto", "Uno de los extremos ya es raíz de f, así que el método termina de inmediato."))
     return B
@@ -126,10 +129,14 @@ def _verif_secante(res, d):
 def _verif_punto_fijo(res, d):
     x0 = res.ctx["entradas"]["x0"]
     gp0 = res.ctx["gp"](x0)
+    cumple = abs(gp0) < 1
     return [("latex", rf"g(x) = {res.ctx['latex']}"),
-            ("texto", f"Valor inicial x₀ = {txt_num(x0, d)}. Se verifica la condición de convergencia local:"),
-            ("latex", rf"|g'(x_0)| = \left|{_sust(res.ctx['dexpr'], x0, d)}\right| = {N(abs(gp0), d)} < 1"),
-            ("texto", "Se cumple |g'(x₀)| < 1, así que la iteración debe converger.")]
+            ("texto", f"Valor inicial x₀ = {txt_num(x0, d)}. Se revisa la condición de convergencia local:"),
+            ("latex", rf"|g'(x_0)| = \left|{_sust(res.ctx['dexpr'], x0, d)}\right| = {N(abs(gp0), d)} "
+                      + ("< 1" if cumple else r"\ge 1")),
+            ("texto", "Se cumple |g'(x₀)| < 1: cerca de x₀ la iteración se va acercando al punto fijo." if cumple else
+             "No se cumple en x₀. Eso no prueba que diverja: lo que importa es |g'(x)| < 1 cerca del punto fijo. "
+             "Se itera de todos modos y se revisa el resultado.")]
 
 
 def _verif_aitken(res, d):
@@ -269,10 +276,14 @@ _ITERACION = {"biseccion": _it_cerrados, "falsa_posicion": _it_cerrados, "newton
 
 def detalle_iteracion(res: Resultado, k: int, d: int = 6) -> list[str]:
     """Líneas LaTeX que desarrollan la iteración k (empezando en 1) con los valores ya sustituidos."""
+    if res.id in _DIRECTOS:
+        return detalle_directo(res, k, d)
     return _ITERACION[res.id](res, k, d)
 
 
 def etiqueta_paso(res: Resultado, k: int, final: bool = False) -> str:
+    if res.id in _DIRECTOS:
+        return etiqueta_paso_directo(res, k, final)
     nombre = "Etapa" if res.id == "deflacion" else "Iteración"
     if final:
         # La última fila es la que da el resultado si convergió; si no, es simplemente la última que se hizo.
@@ -311,6 +322,8 @@ def _conclusion(res, d, omitidas):
         if res.error_final == res.error_final:
             B.append(("latex", rf"E_{{{res.n_iter}}} = {N(res.error_final, d)} > {tex_tol(res.tol)}"))
     etiqueta, valor = _residuo(res)
+    if res.ctx.get("aviso"):
+        B.append(("texto", "Atención: " + res.ctx["aviso"]))
     B.append(("texto", "Aproximación final y verificación:"))
     B.append(("latex", rf"x^{{*}} \approx {N(res.valor, d)}"))
     B.append(("latex", rf"{etiqueta} = {N(valor, d)}"))
@@ -333,6 +346,8 @@ def elegir_iteraciones(res: Resultado, seleccion) -> tuple[list[int], bool]:
 
 
 def bloques(res: Resultado, d: int = 6, iteraciones=(1, 2, 3)) -> list[tuple[str, str]]:
+    if res.id in _DIRECTOS:   # Punto flotante, interpolación, derivación e integración tienen su propio desarrollo.
+        return bloques_directo(res, d, iteraciones, elegir_iteraciones)
     texto, formulas = _PLANTEAMIENTO[res.id]
     B: list[tuple[str, str]] = [("titulo", "Planteamiento"), ("texto", texto)]
     B += [("latex", f) for f in formulas(res, d)]

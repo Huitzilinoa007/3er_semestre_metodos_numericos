@@ -5,6 +5,7 @@ import numpy as np
 
 from .abiertos import figura_muller, figura_newton, figura_punto_fijo, figura_secante
 from .cerrados import figura_cerrado, graficar_metodo_cerrado
+from .directos import FIGURAS_DIRECTAS, rango_directo
 from .secuencias import figura_aitken, figura_deflacion
 
 # Aquí se registra la gráfica de cada método. Para uno nuevo: escribe su función en este paquete y agrega una línea.
@@ -17,6 +18,7 @@ _FIGURAS = {
     "aitken": figura_aitken,
     "deflacion": figura_deflacion,
     "muller": figura_muller,
+    **FIGURAS_DIRECTAS,   # Punto flotante, interpolación, derivación e integración.
 }
 
 
@@ -34,6 +36,8 @@ def _con_margen(valores, relativo=0.35, minimo=1.0):
 def rango_auto(res) -> tuple[float, float]:
     """Rango del eje X que encuadra los puntos del método, con margen."""
     df, ctx = res.df, res.ctx
+    if res.id in FIGURAS_DIRECTAS:
+        return rango_directo(res)
     if res.id in ("biseccion", "falsa_posicion"):
         a, b = ctx["a0"], ctx["b0"]
         pad = 0.25 * (b - a)

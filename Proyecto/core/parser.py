@@ -16,6 +16,7 @@ from sympy.parsing.sympy_parser import (
 
 # Aquí se define x una sola vez porque todo el programa trabaja con una única variable.
 X = sp.Symbol("x")
+Y = sp.Symbol("y")   # Segunda variable: solo se acepta en las integrales dobles, f(x, y).
 MAX_LONGITUD = 200  # Un tope de longitud evita que alguien pegue un texto enorme que trabe la app.
 
 
@@ -55,11 +56,12 @@ def _normalizar(texto: str) -> str:
     for viejo, nuevo in _SUSTITUCIONES.items():
         texto = texto.replace(viejo, nuevo)
     # Aquí se inserta el * porque SymPy leería "x(x+1)" como una función llamada x, no como x multiplicado por (x+1).
-    texto = re.sub(r"\b[xX]\s*\(", "x*(", texto)
+    texto = re.sub(r"\b([xXyY])\s*\(", lambda m: m.group(1).lower() + "*(", texto)
     return texto.strip()
 
 
-def _validar(texto: str) -> None:
+def _validar(texto: str, local: dict | None = None) -> None:
+    local = _LOCAL if local is None else local
     if not texto:
         raise ErrorExpresion("Escribe una expresión. Ejemplo: x**3 - 2*x - 5")
     if len(texto) > MAX_LONGITUD:
@@ -75,7 +77,7 @@ def _validar(texto: str) -> None:
         raise ErrorExpresion("La expresión contiene una construcción no permitida.")
     # Aquí se avisa antes de que SymPy falle, porque un nombre como "foo(" daría un mensaje confuso.
     for nombre in re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", texto):
-        if nombre not in _LOCAL:
+        if nombre not in local:
             raise ErrorExpresion(
                 f"No conozco la función «{nombre}». Disponibles: sin, cos, tan, exp, log, ln, sqrt, abs, entre otras."
             )
@@ -89,15 +91,19 @@ def _validar(texto: str) -> None:
         raise ErrorExpresion("Falta cerrar un paréntesis: hay más «(» que «)».")
 
 
-def parsear(texto: str) -> sp.Expr:
-    """Convierte texto en una expresión SymPy en la variable x, o lanza ErrorExpresion."""
+def parsear(texto: str, variables: tuple[str, ...] = ("x",)) -> sp.Expr:
+    """Convierte texto en una expresión SymPy en la variable x (o en x, y), o lanza ErrorExpresion."""
     original = (texto or "").strip()
     texto = _normalizar(original)
-    _validar(texto)
+    # Aquí se arma el diccionario de nombres conocidos según las variables permitidas (x sola, o x y y).
+    local = dict(_LOCAL)
+    if "y" in variables:
+        local.update({"y": Y, "Y": Y})
+    _validar(texto, local)
     try:
         # Ya con el texto validado se lee con los diccionarios cerrados de arriba.
         expr = parse_expr(
-            texto, local_dict=dict(_LOCAL), global_dict=dict(_GLOBAL),
+            texto, local_dict=local, global_dict=dict(_GLOBAL),
             transformations=_TRANSFORMACIONES,
         )
     except Exception as exc:  # Aquí se atrapa todo porque SymPy lanza muchos tipos de error distintos para una mala sintaxis.
@@ -116,10 +122,13 @@ def parsear(texto: str) -> sp.Expr:
             + ". Funciones disponibles: sin, cos, tan, exp, log, ln, sqrt, abs, entre otras."
         )
     # Si quedó algún símbolo distinto de x (por ejemplo "sinx" se lee como s*i*n*x), se avisa en lugar de calcular algo raro.
-    extra = sorted(str(s) for s in expr.free_symbols if s != X)
+    permitidas = {X} | ({Y} if "y" in variables else set())
+    extra = sorted(str(s) for s in expr.free_symbols if s not in permitidas)
     if extra:
+        nombres = " y ".join(variables)
         raise ErrorExpresion(
-            "Solo se admite la variable x; encontré: " + ", ".join(extra)
+            f"Solo se admite{'n las variables' if len(variables) > 1 else ' la variable'} {nombres}; encontré: "
+            + ", ".join(extra)
             + ". Revisa los nombres de las funciones (por ejemplo sin(x), no sinx)."
         )
     if expr.has(sp.I) or expr.has(sp.zoo) or expr.has(sp.nan) or expr.has(sp.oo):
@@ -186,3 +195,58 @@ def parsear_funcion(texto: str):
     """Compatibilidad con tu `utils.parsear_funcion` original: devuelve (f_numérica, latex)."""
     expr = parsear(texto)
     return compilar(expr), latex_de(expr)
+
+
+# ----------------------------------------------------------------------------- funciones de dos variables
+def compilar_xy(expr: sp.Expr):
+    """f(x, y) numérica (para las integrales dobles). Acepta números o arreglos del mismo tamaño."""
+    f_num = sp.lambdify((X, Y), expr, modules=["numpy"])
+
+    def f(x, y):
+        escalar = np.ndim(x) == 0 and np.ndim(y) == 0
+        xa, ya = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
+        with np.errstate(all="ignore"):
+            res = np.broadcast_to(f_num(xa, ya), xa.shape).astype(float)
+        return float(res) if escalar else res
+
+    return f
+
+
+# ----------------------------------------------------------------------------- listas de números
+def parsear_numero(texto: str) -> float:
+    """Un número escrito por el usuario; acepta expresiones constantes como pi/4, 1/3 o sqrt(2)."""
+    expr = parsear(texto)
+    if expr.free_symbols:
+        raise ErrorExpresion(f"«{texto.strip()}» debe ser un número, no una función de x.")
+    valor = float(expr.evalf())
+    if not np.isfinite(valor):
+        raise ErrorExpresion(f"«{texto.strip()}» no es un número finito.")
+    return valor
+
+
+def parsear_lista(texto: str, nombre: str = "la lista") -> list[float]:
+    """Lista de números separados por comas, punto y coma o espacios: «1, 2.5, pi/2»."""
+    texto = (texto or "").strip()
+    # Con comas o punto y coma se separa solo por ellos (así «2 pi» sigue siendo un número); si no, por espacios.
+    separador = r"[;,]" if re.search(r"[;,]", texto) else r"\s+"
+    piezas = [p.strip() for p in re.split(separador, texto) if p.strip()]
+    if not piezas:
+        raise ErrorExpresion(f"Escribe {nombre}: números separados por comas, por ejemplo 1, 1.3, 1.6.")
+    if len(piezas) > 30:
+        raise ErrorExpresion(f"{nombre.capitalize()} tiene demasiados valores (máximo 30).")
+    valores = []
+    for p in piezas:
+        try:
+            valores.append(parsear_numero(p))
+        except ErrorExpresion as exc:
+            raise ErrorExpresion(f"En {nombre}: «{p}» no es un número válido. Separa los valores con comas.") from exc
+    return valores
+
+
+def es_lista(texto: str) -> bool:
+    """True si el texto parece una lista de números (y no una función de x)."""
+    try:
+        parsear_lista(texto)
+        return True
+    except ErrorExpresion:
+        return False

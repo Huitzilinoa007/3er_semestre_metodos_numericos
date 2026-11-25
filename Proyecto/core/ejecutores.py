@@ -122,13 +122,33 @@ def _ej_cerrado(metodo_id, funcion):
         a, b = float(n["a"]), float(n["b"])
         if not a < b:
             raise ValueError("El límite a debe ser menor que el límite b.")
+        for extremo, nombre in ((a, "a"), (b, "b")):
+            if not np.isfinite(f(extremo)):
+                raise ErrorNumerico(f"f no está definida en el extremo {nombre} = {extremo:g}; elige un intervalo donde f exista.")
         raiz, df = funcion(f, a, b, tol, nmax)
+        malos = df[~np.isfinite(df["f(c)"].astype(float))]
+        if len(malos):
+            # El punto c cayó justo donde f no existe: casi siempre es una asíntota (polo) dentro de [a, b].
+            c_malo = float(malos["c"].iloc[0])
+            raise ErrorNumerico(f"En la iteración {int(malos['iter'].iloc[0])} el método cayó en c = {c_malo:.6g}, donde f no "
+                                "está definida (división entre cero o asíntota). Bolzano necesita f continua en [a, b]: "
+                                "si hay una asíntota en el intervalo, el cambio de signo no indica una raíz.")
         df = _finalizar(df)
         ult = df.iloc[-1]
         # Convergió si la última f(c) es casi cero, o si el error de la última fila ya cumple la tolerancia.
         conv = bool(abs(ult["f(c)"]) < 1e-14 or (len(df) > 1 and ult["error"] <= tol))
+        extra = {}
+        # Bolzano solo garantiza raíz si f es CONTINUA. Con un polo (1/x, tan x) el intervalo se encoge igual,
+        # pero alrededor de la asíntota: |f(c)| crece en vez de bajar. Si al final |f(c)| es mayor que en los
+        # extremos originales, no es una raíz: se marca como "No convergió" y se explica.
+        fc_final, escala = abs(float(ult["f(c)"])), max(abs(float(df.iloc[0]["f(a)"])), abs(float(df.iloc[0]["f(b)"])), 1.0)
+        if fc_final > escala:
+            conv = False
+            extra["aviso"] = (f"El intervalo se cerró alrededor de x ≈ {raiz:.6g}, pero ahí |f(c)| = {fc_final:.3g} es enorme: "
+                              "no es una raíz, es una discontinuidad (un polo). Bolzano necesita que f sea continua "
+                              "en [a, b]; elige un intervalo que no contenga asíntotas.")
         return Resultado(metodo_id, raiz, df, conv, tol, nmax, "c",
-                         _ctx(expr, f, a0=a, b0=b, entradas=dict(a=a, b=b)))
+                         _ctx(expr, f, a0=a, b0=b, entradas=dict(a=a, b=b), **extra))
     return ejecutor
 
 
@@ -138,11 +158,13 @@ def _ej_newton(t, n, tol, nmax):
     dexpr = derivada(expr)   # La derivada se calcula sola; el usuario solo escribe f(x).
     fp = compilar(dexpr)
     x0 = float(n["x0"])
-    raiz, df = raiz_newton(f, fp, x0, tol, nmax)
+    raiz, df = raiz_newton(f, fp, x0, tol, nmax, lanzar=False)
     if df.empty:  # x0 ya era raíz: se arma una fila para que la tabla no quede vacía.
         df = pd.DataFrame([{"x": x0, "f(x)": 0.0, "x1": x0, "f'(x)": fp(x0), "error": 0.0, "error relativo": 0.0}])
     df = _finalizar(df)
-    return Resultado("newton", raiz, df, True, tol, nmax, "x1",
+    # Convergió si el último error cumple la tolerancia (con nmax agotado se devuelve la tabla y se marca que no).
+    conv = bool(df["error"].iloc[-1] <= tol and (len(df) > 1 or df["f(x)"].iloc[0] == 0))
+    return Resultado("newton", raiz, df, conv, tol, nmax, "x1",
                      _ctx(expr, f, fp=fp, dexpr=dexpr, latex_fp=latex_de(dexpr), entradas=dict(x0=x0)))
 
 
@@ -170,10 +192,26 @@ def _ej_punto_fijo(t, n, tol, nmax):
     dexpr = derivada(expr)   # g'(x) se necesita para comprobar que |g'(x0)| < 1.
     gp = compilar(dexpr)
     x0 = float(n["x0"])
-    raiz, df = punto_fijo_validado(x0, g, gp, tol, nmax)
+    if not np.isfinite(g(x0)):
+        raise ErrorNumerico(f"g no está definida en x₀ = {x0:g}.")
+    raiz, df = punto_fijo_validado(x0, g, gp, tol, nmax, estricto=False)
+    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=["x1"])   # Si diverge, se quitan los valores no finitos.
+    if df.empty:
+        raise ErrorNumerico("La iteración produjo valores no finitos desde el primer paso; prueba con otro x₀.")
     df = _finalizar(df)
-    return Resultado("punto_fijo", raiz, df, True, tol, nmax, "x1",
-                     _ctx(expr, g, g=g, gp=gp, dexpr=dexpr, latex_gp=latex_de(dexpr), entradas=dict(x0=x0)))
+    raiz = float(df["x1"].iloc[-1])
+    conv = bool(df["error"].iloc[-1] <= tol)
+    extra = {}
+    gp0 = abs(gp(x0))
+    if gp0 >= 1:
+        # Antes esto bloqueaba el cálculo. Ahora solo se avisa, porque lo que importa es |g'| cerca del punto fijo.
+        extra["aviso"] = (f"|g'(x₀)| = {gp0:.4g} ≥ 1: la condición de convergencia no se cumple en x₀. "
+                          + ("Aun así la iteración convergió, porque cerca del punto fijo |g'(x)| < 1."
+                             if conv else "La iteración no convergió; prueba otra g(x) u otro x₀."))
+    elif not conv:
+        extra["aviso"] = "La iteración no alcanzó la tolerancia con las iteraciones permitidas."
+    return Resultado("punto_fijo", raiz, df, conv, tol, nmax, "x1",
+                     _ctx(expr, g, g=g, gp=gp, dexpr=dexpr, latex_gp=latex_de(dexpr), entradas=dict(x0=x0), **extra))
 
 
 def _ej_aitken(t, n, tol, nmax):
@@ -183,7 +221,16 @@ def _ej_aitken(t, n, tol, nmax):
     # Primero se genera la sucesión de punto fijo completa (x0, g(x0), g(g(x0)), ...) porque Aitken usa tres términos seguidos.
     xs = [x0]
     for _ in range(nmax + 2):
-        xs.append(g(xs[-1]))
+        try:
+            siguiente = g(xs[-1])
+        except OverflowError:
+            siguiente = float("inf")
+        if not np.isfinite(siguiente) or abs(siguiente) > 1e150:
+            # Antes aquí salía el error crudo de Python "(34, 'Numerical result out of range')".
+            raise ValueError(f"La sucesión x_(k+1) = g(x_k) diverge desde x₀ = {x0:g}: sus valores crecen sin límite "
+                             f"(x_{len(xs)} ya no es un número finito). Aitken solo acelera sucesiones que convergen; "
+                             "prueba con otra g(x) u otro x₀.")
+        xs.append(siguiente)
 
     filas, previo, conv = [], None, False
     for k in range(nmax):
@@ -211,7 +258,12 @@ def _ej_deflacion(t, n, tol, nmax):
     expr = parsear(t["p"])
     coefs = coeficientes_polinomio(expr)   # Esto también valida que de verdad sea un polinomio.
     x0 = float(n["x0"])
-    raices, df = deflacion(expr, x0, tol, nmax)
+    try:
+        raices, df = deflacion(expr, x0, tol, nmax)
+    except RuntimeError as exc:
+        raise RuntimeError(f"Newton no encontró una raíz real ({exc}) Es probable que al polinomio le queden "
+                           "raíces complejas, que Newton con valores reales no puede hallar: usa el método de Müller, "
+                           "que sí las encuentra.") from exc
     df = df.rename(columns={"etapa": "iter"}).reset_index(drop=True)  # "iter" para que la tabla y el slider funcionen igual que en los demás.
     return Resultado("deflacion", list(raices), df, True, tol, nmax, "raiz",
                      _ctx(expr, compilar(expr), coefs=coefs, entradas=dict(x0=x0),
@@ -224,13 +276,14 @@ def _ej_muller(t, n, tol, nmax):
     p0, p1, p2 = float(n["p0"]), float(n["p1"]), float(n["p2"])
     if len({p0, p1, p2}) < 3:
         raise ValueError("Los tres puntos iniciales P₀, P₁ y P₂ deben ser distintos.")
-    raiz, df = muller(f_cx, p0, p1, p2, tol, nmax)
+    raiz, df = muller(f_cx, p0, p1, p2, tol, nmax, lanzar=False)
     df = _finalizar(df)
+    conv = bool(df["error"].iloc[-1] <= tol or f_cx(raiz) == 0)
     valor = complex(raiz)
     # Si la parte imaginaria es solo "ruido" numérico, se muestra el resultado como real.
     if abs(valor.imag) <= 1e-12 * max(1.0, abs(valor.real)):
         valor = valor.real
-    return Resultado("muller", valor, df, True, tol, nmax, "P3",
+    return Resultado("muller", valor, df, conv, tol, nmax, "P3",
                      _ctx(expr, compilar(expr), f_cx=f_cx, entradas=dict(p0=p0, p1=p1, p2=p2)))
 
 
@@ -245,6 +298,13 @@ EJECUTORES = {
     "deflacion": _ej_deflacion,
     "muller": _ej_muller,
 }
+
+
+# Los métodos directos (punto flotante, interpolación, derivación, integración) viven en su propio archivo
+# para no mezclarlos con los de raíces; aquí solo se suman al mismo diccionario.
+from .ejecutores_directos import EJECUTORES_DIRECTOS  # noqa: E402
+
+EJECUTORES.update(EJECUTORES_DIRECTOS)
 
 
 def ejecutar(metodo: str, textos: dict, numeros: dict, tol: float, n_max: int) -> Resultado:
