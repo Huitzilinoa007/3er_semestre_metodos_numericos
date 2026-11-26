@@ -174,6 +174,18 @@ def _reglas_punto_flotante(i, res):
             "operación": op, "resultado": res_, "bit": bit}
 
 
+def _reglas_punto_flotante_inv(i, res):
+    p = i - 1
+    parte = res.df["parte"].iloc[i]
+    sigue = i > 0 and res.df["parte"].iloc[p] == parte
+    return {"paso": _r([], "número de paso"), "parte": _r([], "campo al que pertenece el bit"),
+            "posición": _r([], "potencia de 2 que vale este bit"), "bit": _r([], "dato: el bit"),
+            "valor": _r([(i, "posición")], "valor de la posición: 2 elevado a esa potencia"),
+            "aporte": _r([(i, "bit"), (i, "valor")], "aporte = bit × valor de la posición"),
+            "acumulado": _r([(p, "acumulado"), (i, "aporte")], "acumulado anterior + aporte") if sigue
+            else _r([(i, "aporte")], "la suma empieza con el primer aporte")}
+
+
 def _reglas_neville(i, res):
     reglas = {"i": _r([], "índice del nodo"), "xᵢ": _r([], "dato: nodo xᵢ"),
               "x − xᵢ": _r([(i, "xᵢ")], "distancia del punto x al nodo xᵢ"),
@@ -256,6 +268,7 @@ _ORDEN_REGLA = ["i", "xᵢ", "f(xᵢ)", "peso", "peso·f(xᵢ)", "suma acumulada
 _ORDEN_DOBLE = ["i", "xᵢ", "c(xᵢ)", "d(xᵢ)", "kᵢ", "Jᵢ", "peso", "peso·Jᵢ"]
 PLANES.update({
     "punto_flotante": (["paso", "parte", "operación", "resultado", "bit"], _reglas_punto_flotante),
+    "punto_flotante_inv": (["paso", "parte", "posición", "bit", "valor", "aporte", "acumulado"], _reglas_punto_flotante_inv),
     "neville": (["i", "xᵢ", "x − xᵢ"] + _QS, _reglas_neville),
     "hermite": (["i", "zᵢ"] + _QS, _reglas_hermite),
     "derivada_2p": (_ORDEN_DERIV, _reglas_derivada),

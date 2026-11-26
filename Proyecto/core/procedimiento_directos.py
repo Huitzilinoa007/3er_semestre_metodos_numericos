@@ -102,6 +102,61 @@ def _conclusion_pf(res, d):
     return B
 
 
+# ============================================================================= PUNTO FLOTANTE (inverso)
+def _plan_pf_inv(res, d):
+    c = res.ctx
+    return ("Para leer un número IEEE 754 se separan los bits en signo, exponente y mantisa. El exponente guardado E "
+            "se pasa a decimal sumando las potencias de 2 de sus bits; la mantisa vale la suma de 2^(−j) de cada bit "
+            "en 1. Con eso se arma el número: (−1)^s × (1 + mantisa) × 2^(E − sesgo). Casos especiales: E con todos "
+            "los bits en 0 es cero o subnormal (sin el 1 implícito), y E con todos en 1 es infinito o NaN.",
+            [r"x = (-1)^{s}\,(1 + m)\times 2^{E - \text{sesgo}}, \qquad m = \sum_{j=1}^{p} b_j\,2^{-j}",
+             rf"\text{{precisión {c['formato']}: }} 1 \text{{ bit de signo}},\ {c['n_exp']} \text{{ de exponente}},\ "
+             rf"{c['n_man']} \text{{ de mantisa}},\ \text{{sesgo}} = {c['sesgo']}"])
+
+
+def _datos_pf_inv(res, d):
+    c = res.ctx["datos"]
+    return [("texto", f"Representación dada: 0x{c['hexadecimal']} ({len(c['bits'])} bits). Se separa en sus tres campos:"),
+            ("latex", rf"\texttt{{{c['bits'][0]}}}\ |\ \texttt{{{c['e_bits']}}}\ |\ \texttt{{{_agrupar(c['m_bits'], 8)}}}"),
+            ("latex", rf"s = {c['s']} \quad (\text{{el número es {'negativo' if c['s'] else 'positivo'}}})")]
+
+
+def _paso_pf_inv(res, k, d):
+    r = res.df.iloc[k - 1]
+    simbolo = "E" if r["parte"] == "exponente" else "m"
+    pot = r["posición"].replace("2^", "")
+
+    def num(texto):   # Los valores vienen como texto exacto; si traen notación científica se pasan a LaTeX.
+        return N(float(texto), max(d, 10)) if "e" in texto else texto
+    return [rf"\text{{bit de {r['parte']}}} = {int(r['bit'])} \;\Rightarrow\; {int(r['bit'])}\cdot 2^{{{pot}}} = {num(r['aporte'])}",
+            rf"{simbolo} \text{{ acumulado}} = {num(r['acumulado'])}"]
+
+
+def _conclusion_pf_inv(res, d):
+    from .metodos.punto_flotante import decimal_exacto
+    c = res.ctx["datos"]
+    B = [("titulo", "Armado del número")]
+    B.append(("latex", rf"E = ({c['e_bits']})_2 = {c['E']}"))
+    if c["caso"] in ("infinito", "nan"):
+        B.append(("texto", "El exponente tiene todos sus bits en 1: es un valor especial. "
+                           + ("Con mantisa 0 es infinito." if c["caso"] == "infinito" else "Con mantisa distinta de 0 es NaN (no es un número).")))
+        B.append(("latex", (r"x = -\infty" if c["s"] else r"x = +\infty") if c["caso"] == "infinito" else r"x = \text{NaN}"))
+        return B
+    B.append(("latex", rf"m = ({_agrupar(c['m_bits'].rstrip('0') or '0')})_2 \text{{ después del punto}} = {N(float(c['frac']), max(d, 10))}"))
+    if c["caso"] == "normal":
+        e = c["E"] - c["sesgo"]
+        B.append(("latex", rf"e = E - \text{{sesgo}} = {c['E']} - {c['sesgo']} = {e}"))
+        B.append(("latex", rf"x = (-1)^{{{c['s']}}}\,(1 + {N(float(c['frac']), max(d, 10))})\times 2^{{{e}}}"))
+    elif c["caso"] == "subnormal":
+        B.append(("texto", "El exponente guardado es 0: número subnormal, sin el 1 implícito y con exponente fijo 1 − sesgo."))
+        B.append(("latex", rf"x = (-1)^{{{c['s']}}}\,{N(float(c['frac']), max(d, 10))}\times 2^{{{1 - c['sesgo']}}}"))
+    else:
+        B.append(("texto", "Exponente y mantisa en 0: es el cero" + (" negativo (−0)." if c["s"] else ".")))
+    B.append(("texto", "Valor decimal exacto que representan los bits:"))
+    B.append(("latex", rf"x = {decimal_exacto(c['valor'])}"))
+    return B
+
+
 # ============================================================================= NEVILLE
 def _plan_neville(res, d):
     return ("Neville evalúa el polinomio interpolante en un punto x sin calcular sus coeficientes. Qᵢ,ⱼ es el valor "
@@ -451,6 +506,7 @@ def _conclusion_doble(res, d):
 # id -> (planteamiento, datos, paso, conclusión, título de la sección de pasos)
 METODOS = {
     "punto_flotante": (_plan_pf, _datos_pf, _paso_pf, _conclusion_pf, "Conversión a binario"),
+    "punto_flotante_inv": (_plan_pf_inv, _datos_pf_inv, _paso_pf_inv, _conclusion_pf_inv, "Valor de cada bit"),
     "neville": (_plan_neville, _datos_interp, _paso_neville, _conclusion_neville, "Filas de la tabla de Neville"),
     "hermite": (_plan_hermite, lambda r, d: _datos_interp(r, d, True), _paso_hermite, _conclusion_hermite,
                 "Filas de la tabla de diferencias divididas"),

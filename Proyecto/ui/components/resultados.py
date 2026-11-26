@@ -27,8 +27,12 @@ def _valor_texto(res: Resultado, d: int) -> str:
 def kpis(res: Resultado, d: int) -> None:
     if "kpis" in res.ctx:
         # Los métodos directos traen sus propias tarjetas (valor, referencia, error, cota…).
+        usadas = set()
         for columna, (clave, etiqueta, valor, ayuda) in zip(st.columns(len(res.ctx["kpis"])), res.ctx["kpis"]):
-            with columna, contenedor(clave):
+            # Streamlit no acepta dos contenedores con la misma key: si se repite (dos tarjetas de error), se numera.
+            key = clave if clave not in usadas else f"{clave}_{len(usadas)}"
+            usadas.add(clave)
+            with columna, contenedor(key):
                 st.metric(etiqueta, valor, help=ayuda)
         return
     es_lista = isinstance(res.valor, (list, tuple))

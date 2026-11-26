@@ -18,6 +18,7 @@ from .metodos.integracion import cuadratura_adaptativa, regla_compuesta
 from .metodos.integracion_multiple import integral_doble
 from .metodos.neville import tabla_neville
 from .metodos.punto_flotante import decimal_exacto, punto_flotante
+from .metodos.punto_flotante_inverso import punto_flotante_inverso
 from .parser import (X, Y, ErrorExpresion, compilar, compilar_xy, derivada, es_lista, latex_de, parsear,
                      parsear_lista)
 
@@ -111,6 +112,34 @@ def _ej_punto_flotante(t, n, tol, nmax):
     ctx = dict(rep=rep, formato=formato, err_abs=err_abs, err_rel=err_rel, eps=eps, u=u, kpis=kpis,
                nombre_paso="Paso", entradas=dict(num=t["num"]), **extra)
     return Resultado("punto_flotante", float(rep.guardado), df, True, tol, nmax, "bit", ctx)
+
+
+def _ej_punto_flotante_dispatch(t, n, tol, nmax):
+    # Un solo método en el menú con dos sentidos: decimal -> IEEE 754, o IEEE 754 (bits / hex) -> decimal.
+    if "decimal" in (t.get("direccion") or "").split("→")[-1].lower():
+        return _ej_punto_flotante_inverso(t, n, tol, nmax)
+    return _ej_punto_flotante(t, n, tol, nmax)
+
+
+def _ej_punto_flotante_inverso(t, n, tol, nmax):
+    formato = "doble" if "64" in (t.get("formato") or "") else "simple"
+    datos, df = punto_flotante_inverso(t["num"], formato)
+    v = datos["valor"]
+    textos = {"normal": "Número normal", "subnormal": "Subnormal", "cero": "Cero", "infinito": "Infinito", "nan": "NaN"}
+    if v is None:
+        valor_txt = ("−∞" if datos["s"] else "+∞") if datos["caso"] == "infinito" else "NaN"
+        valor = float("nan") if datos["caso"] == "nan" else (float("-inf") if datos["s"] else float("inf"))
+    else:
+        valor_txt = decimal_exacto(v)[:22]
+        valor = float(v)
+    kpis = [_kpi_valor("Valor decimal", valor_txt, "Valor exacto que representan los bits."),
+            _kpi("Hexadecimal", "0x" + datos["hexadecimal"], f"{len(datos['bits'])} bits"),
+            _kpi("Exponente", f"E = {datos['E']}, e = {datos['E'] - datos['sesgo']}" if datos["caso"] == "normal"
+                 else f"E = {datos['E']}", f"sesgo = {datos['sesgo']}"),
+            _kpi("Tipo de número", textos[datos["caso"]], None, clave="kpi_estado_ok")]
+    ctx = dict(datos=datos, formato=formato, kpis=kpis, nombre_paso="Bit", n_exp=datos["n_exp"],
+               n_man=datos["n_man"], sesgo=datos["sesgo"], entradas=dict(num=t["num"]))
+    return Resultado("punto_flotante_inv", valor, df, True, tol, nmax, "acumulado", ctx)
 
 
 # ----------------------------------------------------------------------------- interpolación
@@ -308,7 +337,7 @@ def _ej_doble(id_metodo, regla):
 
 
 EJECUTORES_DIRECTOS = {
-    "punto_flotante": _ej_punto_flotante,
+    "punto_flotante": _ej_punto_flotante_dispatch,
     "neville": _ej_neville,
     "hermite": _ej_hermite,
     "derivada_2p": _ej_derivacion("derivada_2p"),
@@ -321,5 +350,5 @@ EJECUTORES_DIRECTOS = {
 }
 
 # Ids de los métodos directos (la interfaz los usa para mostrar sus propias tarjetas y textos).
-DIRECTOS = set(EJECUTORES_DIRECTOS)
+DIRECTOS = set(EJECUTORES_DIRECTOS) | {"punto_flotante_inv"}
 _ = ErrorExpresion   # Se re-exporta para que quien importe este módulo tenga a mano la excepción del parser.
