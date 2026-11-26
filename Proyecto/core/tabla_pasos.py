@@ -151,6 +151,124 @@ PLANES = {
 }
 
 
+# ----------------------------------------------------------------------------- métodos directos
+# Estas reglas reciben también el Resultado (res) porque algunas dependen del contenido de la fila
+# (por ejemplo, en punto flotante una fila puede ser de la parte entera o de la fraccionaria).
+_QS = [f"Q_{j}" for j in range(30)]
+
+
+def _reglas_punto_flotante(i, res):
+    p = i - 1
+    parte = res.df["parte"].iloc[i]
+    anterior_igual = i > 0 and res.df["parte"].iloc[p] == parte
+    if parte == "entera":
+        op = _r([(p, "resultado")], "se divide entre 2 el cociente anterior") if anterior_igual else _r([], "parte entera del número")
+        res_ = _r([(i, "operación")], "cociente de la división entre 2")
+        bit = _r([(i, "operación")], "bit = residuo de la división (0 o 1)")
+    else:
+        op = (_r([(p, "resultado"), (p, "bit")], "se multiplica por 2 lo que quedó después del punto")
+              if anterior_igual else _r([], "parte fraccionaria del número"))
+        res_ = _r([(i, "operación")], "resultado de multiplicar por 2")
+        bit = _r([(i, "resultado")], "bit = parte entera del resultado")
+    return {"paso": _r([], "número de paso"), "parte": _r([], "parte del número que se convierte"),
+            "operación": op, "resultado": res_, "bit": bit}
+
+
+def _reglas_neville(i, res):
+    reglas = {"i": _r([], "índice del nodo"), "xᵢ": _r([], "dato: nodo xᵢ"),
+              "x − xᵢ": _r([(i, "xᵢ")], "distancia del punto x al nodo xᵢ"),
+              "Q_0": _r([], "Qᵢ,₀ = f(xᵢ) (dato)")}
+    for j in range(1, 30):
+        if j <= i:
+            reglas[f"Q_{j}"] = _r([(i, f"Q_{j - 1}"), (i - 1, f"Q_{j - 1}"), (i, "x − xᵢ"), (i - j, "x − xᵢ")],
+                                 f"Q{i},{j} = [(x − x{i - j})·Q{i},{j - 1} − (x − x{i})·Q{i - 1},{j - 1}] / (x{i} − x{i - j})")
+        else:
+            reglas[f"Q_{j}"] = _r([], "no existe (arriba de la diagonal)")
+    return reglas
+
+
+def _reglas_hermite(i, res):
+    reglas = {"i": _r([], "índice"), "zᵢ": _r([], f"zᵢ = x{i // 2} (cada nodo va dos veces)"),
+              "Q_0": _r([], f"Qᵢ,₀ = f(x{i // 2}) (dato)")}
+    if i == 0:
+        reglas["Q_1"] = _r([], "no existe (arriba de la diagonal)")
+    elif i % 2 == 1:
+        reglas["Q_1"] = _r([], f"nodo repetido: Q{i},1 = f'(x{i // 2}) (dato)")
+    else:
+        reglas["Q_1"] = _r([(i, "Q_0"), (i - 1, "Q_0"), (i, "zᵢ"), (i - 1, "zᵢ")], f"Q{i},1 = (Q{i},0 − Q{i - 1},0) / (z{i} − z{i - 1})")
+    for j in range(2, 30):
+        if j <= i:
+            reglas[f"Q_{j}"] = _r([(i, f"Q_{j - 1}"), (i - 1, f"Q_{j - 1}"), (i, "zᵢ"), (i - j, "zᵢ")],
+                                 f"Q{i},{j} = (Q{i},{j - 1} − Q{i - 1},{j - 1}) / (z{i} − z{i - j})")
+        else:
+            reglas[f"Q_{j}"] = _r([], "no existe (arriba de la diagonal)")
+    return reglas
+
+
+def _reglas_derivada(i, res):
+    p = i - 1
+    fcols = [c for c in res.df.columns if str(c).startswith("f(")]
+    reglas = {"k": _r([], "número de paso"),
+              "h": _r([(p, "h")], "h = h anterior / 2") if i else _r([], "dato: h inicial"),
+              "aproximación": _r([(i, "h")] + [(i, c) for c in fcols], "se aplica la fórmula con estos valores"),
+              "error real": _r([(i, "aproximación")], "error = |aproximación − f'(x₀) exacta|"),
+              "razón": _r([(p, "error real"), (i, "error real")], "razón = error anterior / error actual") if i else _r([], "sin error anterior")}
+    for c in fcols:
+        reglas[c] = _r([(i, "h")], f"se evalúa {c} con este h")
+    return reglas
+
+
+def _reglas_regla(i, res):
+    p = i - 1
+    return {"i": _r([], "índice del nodo"),
+            "xᵢ": _r([(p, "xᵢ")], "xᵢ = xᵢ₋₁ + h") if i else _r([], "x₀ = a"),
+            "f(xᵢ)": _r([(i, "xᵢ")], "se evalúa f en xᵢ"),
+            "peso": _r([(i, "i")], "peso de la regla para este nodo"),
+            "peso·f(xᵢ)": _r([(i, "peso"), (i, "f(xᵢ)")], "peso × f(xᵢ)"),
+            "suma acumulada": _r([(p, "suma acumulada"), (i, "peso·f(xᵢ)")], "suma anterior + peso·f(xᵢ)") if i
+            else _r([(i, "peso·f(xᵢ)")], "la suma empieza con el primer término")}
+
+
+def _reglas_adaptativa(i, res):
+    return {"paso": _r([], "número de paso"), "nivel": _r([], "nivel de división del subintervalo"),
+            "a": _r([], "extremo izquierdo"), "b": _r([], "extremo derecho"),
+            "S(a,b)": _r([(i, "a"), (i, "b")], "Simpson en todo [a, b]"),
+            "S(a,m)+S(m,b)": _r([(i, "a"), (i, "b")], "Simpson en cada mitad, sumado"),
+            "|diferencia|": _r([(i, "S(a,b)"), (i, "S(a,m)+S(m,b)")], "|S(a,m) + S(m,b) − S(a,b)|"),
+            "15·tol": _r([(i, "nivel")], "15 × tolerancia (se parte a la mitad en cada nivel)"),
+            "decisión": _r([(i, "|diferencia|"), (i, "15·tol")], "si |diferencia| < 15·tol se acepta; si no, se divide")}
+
+
+def _reglas_doble(i, res):
+    return {"i": _r([], "índice del nodo en x"),
+            "xᵢ": _r([(i - 1, "xᵢ")], "xᵢ = xᵢ₋₁ + h") if i else _r([], "x₀ = a"),
+            "c(xᵢ)": _r([(i, "xᵢ")], "límite inferior en y: c(xᵢ)"),
+            "d(xᵢ)": _r([(i, "xᵢ")], "límite superior en y: d(xᵢ)"),
+            "kᵢ": _r([(i, "c(xᵢ)"), (i, "d(xᵢ)")], "kᵢ = (d − c) / m"),
+            "Jᵢ": _r([(i, "xᵢ"), (i, "c(xᵢ)"), (i, "kᵢ")], "integral interior en y con la regla elegida"),
+            "peso": _r([(i, "i")], "peso de la regla para este nodo en x"),
+            "peso·Jᵢ": _r([(i, "peso"), (i, "Jᵢ")], "peso × Jᵢ")}
+
+
+_ORDEN_DERIV = ["k", "h", "f(x₀−2h)", "f(x₀−h)", "f(x₀)", "f(x₀+h)", "f(x₀+2h)", "f(x₀+3h)", "f(x₀+4h)",
+                "aproximación", "error real", "razón"]
+_ORDEN_REGLA = ["i", "xᵢ", "f(xᵢ)", "peso", "peso·f(xᵢ)", "suma acumulada"]
+_ORDEN_DOBLE = ["i", "xᵢ", "c(xᵢ)", "d(xᵢ)", "kᵢ", "Jᵢ", "peso", "peso·Jᵢ"]
+PLANES.update({
+    "punto_flotante": (["paso", "parte", "operación", "resultado", "bit"], _reglas_punto_flotante),
+    "neville": (["i", "xᵢ", "x − xᵢ"] + _QS, _reglas_neville),
+    "hermite": (["i", "zᵢ"] + _QS, _reglas_hermite),
+    "derivada_2p": (_ORDEN_DERIV, _reglas_derivada),
+    "derivada_5p": (_ORDEN_DERIV, _reglas_derivada),
+    "trapecio": (_ORDEN_REGLA, _reglas_regla),
+    "simpson38": (_ORDEN_REGLA, _reglas_regla),
+    "adaptativa": (["paso", "nivel", "a", "b", "S(a,b)", "S(a,m)+S(m,b)", "|diferencia|", "15·tol", "decisión"],
+                   _reglas_adaptativa),
+    "doble_trapecio": (_ORDEN_DOBLE, _reglas_doble),
+    "doble_simpson38": (_ORDEN_DOBLE, _reglas_doble),
+})
+
+
 def plan_llenado(res: Resultado) -> list[Paso]:
     """Lista de pasos (uno por celda) en el orden en que se van llenando."""
     columnas = list(res.df.columns)
@@ -165,9 +283,11 @@ def plan_llenado(res: Resultado) -> list[Paso]:
 
     orden, reglas = PLANES[res.id]
     for i in range(n):
-        # El número de iteración siempre es lo primero que se escribe en la fila.
-        pasos.append(Paso(i, "iter", (), "número de iteración"))
-        r = reglas(i)
+        # El número de iteración siempre es lo primero que se escribe en la fila (si la tabla tiene esa columna).
+        if "iter" in columnas:
+            pasos.append(Paso(i, "iter", (), "número de iteración"))
+        # Las reglas nuevas reciben también el resultado (para mirar el contenido de la fila).
+        r = reglas(i, res) if reglas.__code__.co_argcount == 2 else reglas(i)
         for col in orden:
             if col not in columnas:
                 continue

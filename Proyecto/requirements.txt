@@ -4,3 +4,4 @@ numpy>=1.26       # Cálculo con arreglos de números (evaluar f en muchos punto
 pandas>=2.1       # Tablas de iteraciones (DataFrame): el formato en que cada método devuelve su historial.
 sympy>=1.12       # Álgebra simbólica: lee la función escrita, calcula derivadas y genera el LaTeX.
 plotly>=5.20      # Gráficas interactivas (zoom, animación Play/Pausa).
+mpmath>=1.3      # Integrales de referencia de alta precisión (ya viene con sympy).

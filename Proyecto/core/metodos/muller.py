@@ -4,7 +4,7 @@ import pandas as pd
 import cmath  # cmath = matemáticas con números complejos; aquí se usa porque el discriminante puede ser negativo.
 
 
-def muller(f, P0, P1, P2, error, max_iter=1000):
+def muller(f, P0, P1, P2, error, max_iter=1000, lanzar=True):
     estructura = {
         'P0': [], 'P1': [], 'P2': [],
         'f(P0)': [], 'f(P1)': [], 'f(P2)': [],
@@ -21,7 +21,9 @@ def muller(f, P0, P1, P2, error, max_iter=1000):
         # Determinante del sistema que define la parábola; si es cero los puntos están alineados y no hay parábola.
         delta = (P0 - P2) * (P1 - P2) * (P0 - P1)
         if delta == 0:
-            raise ValueError("El determinante delta es cero. Los puntos iniciales colineales generan una división por cero.")
+            # delta solo depende de las x: vale cero cuando dos de los tres puntos coinciden.
+            raise ValueError("Dos de los tres puntos P₀, P₁, P₂ coinciden, así que no hay una parábola única "
+                             "que pase por ellos. Prueba con otros puntos iniciales.")
 
         # Coeficientes a y b de la parábola "desplazada" para que pase por P2 (por eso c = f(P2)).
         a = ((P1 - P2) * (f0 - f2) - (P0 - P2) * (f1 - f2)) / delta
@@ -49,7 +51,8 @@ def muller(f, P0, P1, P2, error, max_iter=1000):
         }])
         df = pd.concat([df, nueva_iter], ignore_index=True)
 
-        if err_iterado <= error:
+        # Si P3 ya es raíz exacta (f(P3) = 0) se termina aquí: seguir repetiría puntos y delta valdría cero.
+        if err_iterado <= error or f(p3) == 0:
             return p3, df
 
         # Se "corre la escalerita": P1 pasa a ser P0, P2 pasa a ser P1 y P3 pasa a ser P2.
@@ -57,4 +60,6 @@ def muller(f, P0, P1, P2, error, max_iter=1000):
         P1 = P2
         P2 = p3
 
+    if not lanzar:   # La app prefiere mostrar la tabla y marcar "No convergió".
+        return P2, df
     raise RuntimeError(f"Se alcanzó el límite máximo de {max_iter} iteraciones sin converger.")

@@ -26,9 +26,12 @@ def inicio() -> None:
     with col2:
         seccion("Módulos disponibles", acento="cian")
         st.markdown(
+            "- **Punto flotante:** cómo se guarda un número en IEEE 754 (simple y doble) y su error de redondeo.\n"
             "- **Raíces:** métodos cerrados y abiertos, aceleración de Aitken, deflación polinomial y Müller.\n"
-            "- **Interpolación:** ajuste polinómico y splines (en desarrollo).\n"
-            "- **Derivadas e Integrales:** cálculo numérico discretizado (en desarrollo)."
+            "- **Interpolación:** Neville y Hermite (Lagrange, diferencias divididas y splines en desarrollo).\n"
+            "- **Derivadas:** fórmulas de 2 y 5 puntos (3 puntos y Richardson en desarrollo).\n"
+            "- **Integrales:** trapecio, Simpson 3/8, cuadratura adaptativa e integrales dobles "
+            "(Simpson 1/3, Romberg y Gauss en desarrollo)."
         )
     # La guía de sintaxis va escondida en un expander porque solo hace falta la primera vez.
     with st.expander("Sintaxis matemática admitida"):

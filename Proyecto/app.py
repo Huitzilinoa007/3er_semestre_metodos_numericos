@@ -8,7 +8,7 @@ import streamlit as st  # Streamlit convierte este script de Python en una pági
 # set_page_config DEBE ser la primera instrucción de Streamlit, por eso va antes de importar el resto de la app.
 st.set_page_config(page_title="Métodos Numéricos", layout="wide")
 
-from registry import INTERPOLACION, DERIVADAS, INTEGRACION, PROXIMAMENTE, RAICES, metodos_de  # noqa: E402
+from registry import CATEGORIAS, PROXIMAMENTE, metodos_de  # noqa: E402
 from ui.theme import aplicar_tema  # noqa: E402
 from ui.views.inicio import inicio  # noqa: E402
 from ui.views.metodo import renderizar_metodo  # noqa: E402
@@ -38,10 +38,11 @@ def _pagina_proximamente(categoria: str, nombre: str):
 
 def _construir_navegacion():
     # El diccionario es {sección del menú: [páginas]}; Streamlit lo convierte en un menú agrupado.
-    paginas = {"Inicio": [st.Page(inicio, title="Inicio", default=True)],
-               RAICES: [_pagina_metodo(m) for m in metodos_de(RAICES)]}
-    for categoria in (INTERPOLACION, DERIVADAS, INTEGRACION):
-        paginas[categoria] = [_pagina_proximamente(categoria, n) for n in PROXIMAMENTE[categoria]]
+    paginas = {"Inicio": [st.Page(inicio, title="Inicio", default=True)]}
+    for categoria in CATEGORIAS:
+        # Primero los métodos que ya funcionan y después los que siguen "en desarrollo".
+        paginas[categoria] = ([_pagina_metodo(m) for m in metodos_de(categoria)]
+                              + [_pagina_proximamente(categoria, n) for n in PROXIMAMENTE.get(categoria, [])])
     try:
         return st.navigation(paginas, position="top")   # Menú arriba: deja todo el ancho para las gráficas.
     except TypeError:                                   # Versiones sin menú superior caen a la barra lateral.

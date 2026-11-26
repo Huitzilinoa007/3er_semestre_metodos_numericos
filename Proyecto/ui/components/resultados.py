@@ -25,6 +25,12 @@ def _valor_texto(res: Resultado, d: int) -> str:
 
 
 def kpis(res: Resultado, d: int) -> None:
+    if "kpis" in res.ctx:
+        # Los métodos directos traen sus propias tarjetas (valor, referencia, error, cota…).
+        for columna, (clave, etiqueta, valor, ayuda) in zip(st.columns(len(res.ctx["kpis"])), res.ctx["kpis"]):
+            with columna, contenedor(clave):
+                st.metric(etiqueta, valor, help=ayuda)
+        return
     es_lista = isinstance(res.valor, (list, tuple))
     residuo = residuo_absoluto(res)
     ayuda_raiz = (f"Verificación: residuo = {txt_sci(residuo, 2)}" if residuo == residuo else None)
@@ -68,7 +74,7 @@ def inspector(res: Resultado, d: int, rango: tuple[float, float]) -> None:
     s = st.session_state
     n = res.n_filas
     clave_k = f"{res.id}__k"
-    nombre_paso = "Etapa" if res.id == "deflacion" else "Iteración"
+    nombre_paso = res.ctx.get("nombre_paso", "Etapa" if res.id == "deflacion" else "Iteración")
 
     if n > 1:
         # Se ajusta el valor guardado por si un resultado nuevo tiene menos iteraciones que el anterior.

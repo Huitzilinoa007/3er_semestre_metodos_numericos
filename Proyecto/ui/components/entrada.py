@@ -8,7 +8,7 @@ import html
 import numpy as np
 import streamlit as st
 
-from core.parser import ErrorExpresion, compilar, latex_de, parsear
+from core.parser import ErrorExpresion, compilar, es_lista, latex_de, parsear, parsear_lista
 from registry import MetodoSpec
 from ui.compat import contenedor
 
@@ -31,12 +31,22 @@ def _vista_previa(campo, texto):
     """Muestra en LaTeX lo que el usuario escribe; si hay error de sintaxis lo explica junto al campo."""
     if not texto or not texto.strip():
         return None
+    tipo = getattr(campo, "tipo", "funcion")
     try:
-        expr = parsear(texto)
-    except ErrorExpresion as exc:
+        if tipo == "numero":
+            from core.metodos.punto_flotante import leer_numero
+            leer_numero(texto)
+            return None
+        if tipo == "lista" or (tipo == "lista_o_funcion" and es_lista(texto)):
+            valores = parsear_lista(texto)
+            st.latex(rf"\left[{', '.join(f'{v:g}' for v in valores)}\right] \quad ({len(valores)}\ \text{{valores}})")
+            return None
+        variables = ("x", "y") if tipo == "funcion_xy" else ("x",)
+        expr = parsear(texto, variables=variables)
+    except (ErrorExpresion, ValueError) as exc:
         _mensaje("msg-error", str(exc))
         return None
-    st.latex(f"{campo.simbolo or 'f'}(x) = {latex_de(expr)}")
+    st.latex(f"{campo.simbolo or 'f'}({', '.join(variables)}) = {latex_de(expr)}")
     return expr
 
 
@@ -81,28 +91,43 @@ def tarjeta_datos(spec: MetodoSpec) -> dict:
                                           help=c.ayuda or None)
             expr = _vista_previa(c, textos[c.key])
 
+        # Selectores (precisión, fórmula…): se guardan junto con los textos porque son texto.
+        for o in spec.campos_opcion:
+            textos[o.key] = st.radio(o.label, o.opciones, horizontal=True, key=clave(spec, o.key), help=o.ayuda or None)
+
         numeros = {}
-        for col, c in zip(st.columns(len(spec.campos_num)), spec.campos_num):
-            with col:
-                # value=None deja el número vacío al abrir; el usuario debe escribirlo.
-                numeros[c.key] = st.number_input(c.label, value=None, placeholder=c.placeholder, step=0.1,
-                                                 format="%g", key=clave(spec, c.key))
+        if spec.campos_num:
+            for col, c in zip(st.columns(len(spec.campos_num)), spec.campos_num):
+                with col:
+                    # value=None deja el número vacío al abrir; el usuario debe escribirlo.
+                    if c.tipo == "entero":
+                        numeros[c.key] = st.number_input(c.label, value=None, placeholder=c.placeholder, step=1,
+                                                         min_value=1, max_value=300, format="%d", key=clave(spec, c.key),
+                                                         help=c.ayuda or None)
+                    else:
+                        numeros[c.key] = st.number_input(c.label, value=None, placeholder=c.placeholder, step=0.1,
+                                                         format="%g", key=clave(spec, c.key), help=c.ayuda or None)
         if spec.bolzano:
             _indicador_bolzano(expr, numeros.get("a"), numeros.get("b"))
 
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            tol = st.select_slider("Tolerancia de error", options=TOLERANCIAS, value=1e-6,
-                                   format_func=lambda v: f"{v:.0e}", key=clave(spec, "tol"))
-        with c2:
-            n_max = st.slider("Máx. iteraciones", 1, 100, 50, key=clave(spec, "nmax"))
-        with c3:
-            decimales = st.slider("Decimales mostrados", 2, 12, 6, key=clave(spec, "dec"))
+        # Solo se muestran los controles que usa el método (los de integración, por ejemplo, no tienen tolerancia).
+        controles = [c for c in ("tol", "nmax") if c in spec.controles] + ["dec"]
+        tol, n_max = 1e-6, 50
+        for col, control in zip(st.columns(3 if len(controles) > 1 else [1, 2]), controles):
+            with col:
+                if control == "tol":
+                    tol = st.select_slider("Tolerancia de error", options=TOLERANCIAS, value=1e-6,
+                                           format_func=lambda v: f"{v:.0e}", key=clave(spec, "tol"))
+                elif control == "nmax":
+                    n_max = st.slider(spec.etiqueta_nmax, 1, 100, 50 if spec.etiqueta_nmax == "Máx. iteraciones" else 20,
+                                      key=clave(spec, "nmax"))
+                else:
+                    decimales = st.slider("Decimales mostrados", 2, 12, 6, key=clave(spec, "dec"))
 
         # Aquí el usuario elige qué iteraciones se desarrollan en el procedimiento. Las opciones llegan hasta 100
         # (fijas) para que el valor por defecto [1, 2, 3] siempre sea válido, aunque el máximo de iteraciones sea menor.
         iteraciones = st.multiselect(
-            "Iteraciones a desarrollar en el procedimiento", options=list(range(1, 101)), default=[1, 2, 3],
+            spec.etiqueta_pasos, options=list(range(1, 101)), default=[1, 2, 3],
             key=clave(spec, "iters"),
             help="Se desarrollan las que elijas y, al final, siempre la última: la que lleva al resultado.")
 
