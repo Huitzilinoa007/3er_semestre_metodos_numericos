@@ -68,6 +68,32 @@ def figura_punto_flotante(res, k, rango=None):
     return E.estilizar(fig, titulo, alto=300, margen_b=30)
 
 
+def figura_punto_flotante_inv(res, k, rango=None):
+    """Los bits en sus tres campos; el bit del paso k se marca en ámbar."""
+    c = res.ctx
+    dat = c["datos"]
+    n_exp, n_man = c["n_exp"], c["n_man"]
+    bits = dat["bits"]
+    total = len(bits)
+    resaltado = k   # La tabla empieza en el primer bit del exponente (posición 1 de la cadena).
+    fig = go.Figure()
+    for i, b in enumerate(bits):
+        color = E.CORAL if i == 0 else (E.VIOLETA if i <= n_exp else E.CIAN)
+        fig.add_shape(type="rect", x0=i, x1=i + 0.92, y0=0, y1=1, fillcolor=color, opacity=1.0 if i == resaltado else 0.8,
+                      line=dict(color=E.AMBAR if i == resaltado else "rgba(0,0,0,0)", width=4), layer="below")
+    fig.add_trace(go.Scatter(x=[i + 0.46 for i in range(total)], y=[0.5] * total, mode="text", text=list(bits),
+                             textfont=dict(color="#0B0F14", size=14 if total <= 32 else 9), hoverinfo="skip",
+                             showlegend=False))
+    for nombre, x0, x1, color in (("signo", 0, 1, E.CORAL), ("exponente", 1, 1 + n_exp, E.VIOLETA),
+                                  ("mantisa", 1 + n_exp, total, E.CIAN)):
+        fig.add_annotation(x=(x0 + x1) / 2, y=1.25, text=nombre, showarrow=False, font=dict(color=color, size=13))
+    fig.update_xaxes(visible=False, range=[-0.5, total + 0.5])
+    fig.update_yaxes(visible=False, range=[-0.6, 1.6])
+    r = res.df.iloc[k - 1]
+    titulo = f"0x{dat['hexadecimal']}  ·  paso {k}: bit de {r['parte']} en {r['posición']} → acumulado {r['acumulado']}"
+    return E.estilizar(fig, titulo, alto=300, margen_b=30)
+
+
 # ----------------------------------------------------------------------------- interpolación
 def _rango_nodos(xs, extra=()):
     v = np.array(list(xs) + [e for e in extra if e is not None], dtype=float)
@@ -299,6 +325,7 @@ def figura_doble(res, k, rango=None):
 
 FIGURAS_DIRECTAS = {
     "punto_flotante": figura_punto_flotante,
+    "punto_flotante_inv": figura_punto_flotante_inv,
     "neville": figura_neville,
     "hermite": figura_hermite,
     "derivada_2p": figura_derivada,

@@ -34,9 +34,7 @@ def _vista_previa(campo, texto):
     tipo = getattr(campo, "tipo", "funcion")
     try:
         if tipo == "numero":
-            from core.metodos.punto_flotante import leer_numero
-            leer_numero(texto)
-            return None
+            return None   # Puede ser un decimal o bits/hex (punto flotante inverso): se valida al calcular.
         if tipo == "lista" or (tipo == "lista_o_funcion" and es_lista(texto)):
             valores = parsear_lista(texto)
             st.latex(rf"\left[{', '.join(f'{v:g}' for v in valores)}\right] \quad ({len(valores)}\ \text{{valores}})")

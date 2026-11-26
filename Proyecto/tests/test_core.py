@@ -225,6 +225,40 @@ class TestPersonaA(unittest.TestCase):
         self.assertEqual(res.ctx["rep"].bits, "11000010111011010100000000000000")   # Ejemplo clásico.
         self.assertEqual(res.ctx["rep"].redondeo, "exacto")
 
+    def test_punto_flotante_inverso(self):
+        # Ida y vuelta: decimal -> bits -> decimal da exactamente el valor guardado, en simple y en doble.
+        import struct
+        inv = "IEEE 754 → decimal"
+        for texto in ("0.1", "-118.625", "1/3", "1e-40", "3.4e38", "0.5", "123456789"):
+            for formato, fmt in (("Simple (32 bits)", ">f"), ("Doble (64 bits)", ">d")):
+                ida = _ej("punto_flotante", {"num": texto, "formato": formato}, {})
+                hexa = ida.ctx["rep"].hexadecimal
+                for entrada in ("0x" + hexa, ida.ctx["rep"].bits):
+                    vuelta = _ej("punto_flotante", {"num": entrada, "formato": formato, "direccion": inv}, {})
+                    self.assertEqual(vuelta.id, "punto_flotante_inv")
+                    self.assertEqual(vuelta.valor, struct.unpack(fmt, bytes.fromhex(hexa))[0], (texto, formato))
+        # Bits separados con espacios, como en el pizarrón.
+        res = _ej("punto_flotante", {"num": "1 10000101 11011010100000000000000", "formato": "Simple (32 bits)",
+                                     "direccion": inv}, {})
+        self.assertEqual(res.valor, -118.625)
+        # Casos especiales.
+        casos = {"7F800000": "infinito", "FF800000": "infinito", "7FC00000": "nan", "00000001": "subnormal",
+                 "80000000": "cero"}
+        for hexa, caso in casos.items():
+            res = _ej("punto_flotante", {"num": hexa, "formato": "Simple (32 bits)", "direccion": inv}, {})
+            self.assertEqual(res.ctx["datos"]["caso"], caso, hexa)
+        with self.assertRaises(ValueError):
+            _ej("punto_flotante", {"num": "0x3DCC", "formato": "Simple (32 bits)", "direccion": inv}, {})
+        # Procedimiento, tabla y gráfica del sentido inverso.
+        from ui.plots import construir_figura, rango_auto
+        res = _ej("punto_flotante", {"num": "0x3DCCCCCD", "formato": "Simple (32 bits)", "direccion": inv}, {})
+        for tipo, contenido in bloques(res, 6, [1, 2, 3]):
+            if tipo == "latex":
+                self.assertTrue(all(_balanceado(p) for p in prefijos_latex(contenido)), contenido)
+        self.assertEqual(len(plan_llenado(res)), res.df.size)
+        for k in range(1, res.n_filas + 1):
+            construir_figura(res, k, rango_auto(res))
+
     def test_interpolacion_burden(self):
         # Burden, ejemplos de Neville (sección 3.2) y Hermite (sección 3.4) con J0(x).
         self.assertAlmostEqual(_ej(*CASOS_A[2]).valor, 0.5118200, places=7)

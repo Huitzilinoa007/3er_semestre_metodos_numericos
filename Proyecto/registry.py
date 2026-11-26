@@ -146,14 +146,20 @@ METODOS_PERSONA_A = (
     MetodoSpec(
         "punto_flotante", "Punto flotante (IEEE 754)", PUNTO_FLOTANTE,
         "Cómo guarda la computadora un número decimal: signo, exponente y mantisa, y cuánto error se comete.",
-        "Escribe un número decimal (por ejemplo 0.1 o -118.625) y elige la precisión.",
+        "Elige el sentido. De decimal a IEEE 754: escribe un número como 0.1 o -118.625. De IEEE 754 a decimal: "
+        "escribe los bits (ej: 0 01111011 10011001100110011001101) o el hexadecimal (ej: 0x3DCCCCCD).",
         r"x = (-1)^{s}\,(1.m)_2 \times 2^{E - \text{sesgo}}",
-        (Campo("num", "Número decimal", "ej: 0.1   -118.625   2.5e-3   1/3", "x",
-               "Se usa el valor EXACTO que escribes (0.1 es exactamente 1/10), no el float de Python.", tipo="numero"),),
-        (), campos_opcion=(Opcion("formato", "Precisión", ("Simple (32 bits)", "Doble (64 bits)")),),
-        titulo_tabla="Tabla de conversión a binario",
-        desc_tabla="Parte entera: divisiones entre 2 (el residuo es el bit). Parte fraccionaria: multiplicaciones por 2 "
-                   "(la parte entera del resultado es el bit).", **_DIRECTO),
+        (Campo("num", "Número decimal, o bits / hexadecimal (sentido inverso)",
+               "ej: 0.1   -118.625   1/3   ·   inverso: 0x3DCCCCCD  o  0 01111011 10011001100110011001101", "x",
+               "Decimal → IEEE 754: se usa el valor EXACTO que escribes (0.1 es exactamente 1/10). "
+               "IEEE 754 → decimal: escribe todos los bits (puedes separarlos con espacios) o el hexadecimal.",
+               tipo="numero"),),
+        (), campos_opcion=(Opcion("direccion", "Sentido", ("Decimal → IEEE 754", "IEEE 754 → decimal")),
+                           Opcion("formato", "Precisión", ("Simple (32 bits)", "Doble (64 bits)"))),
+        titulo_tabla="Tabla de conversión",
+        desc_tabla="Decimal → IEEE 754: divisiones entre 2 para la parte entera (el residuo es el bit) y multiplicaciones "
+                   "por 2 para la fraccionaria. IEEE 754 → decimal: cada bit aporta su potencia de 2 y se va sumando.",
+        **_DIRECTO),
     MetodoSpec(
         "neville", "Neville", INTERPOLACION,
         "Evalúa el polinomio interpolante en un punto con una tabla triangular, sin calcular sus coeficientes.",

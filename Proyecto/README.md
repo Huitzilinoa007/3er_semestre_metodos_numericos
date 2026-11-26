@@ -14,7 +14,7 @@ Pruebas de la lógica (no necesitan Streamlit): `python -m unittest discover -s 
 
 ## Qué hay hoy
 
-- **Errores y Punto Flotante:** Punto flotante IEEE 754 (simple y doble).
+- **Errores y Punto Flotante:** Punto flotante IEEE 754 (simple y doble), en ambos sentidos: de decimal a bits y de bits/hexadecimal a decimal.
 - **Raíces de Ecuaciones:** Bisección, Regla Falsa, Newton-Raphson, Secante, Punto Fijo, Aitken, Deflación y Müller.
 - **Interpolación:** Neville y Hermite.
 - **Derivadas Numéricas:** Derivación por 2 puntos y por 5 puntos (centrada y de extremo).
